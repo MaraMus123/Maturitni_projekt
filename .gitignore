@@ -3,6 +3,7 @@
 *.pyo
 __pycache__/
 credentials/
+toke.pickle
 
 # Virtual environments
 venv/
