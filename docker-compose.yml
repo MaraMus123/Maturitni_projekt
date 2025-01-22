@@ -4,10 +4,10 @@ services:
   app:
     build:
       context: .
-    working_dir: /app/app
     command: python script.py
     volumes:
       - .:/app
+      - ./credentials:/app/credentials
     depends_on:
       - db
 
