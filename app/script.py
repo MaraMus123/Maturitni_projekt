@@ -6,9 +6,9 @@ from helper_files.calendar_creater import calendar_add_events
 def convert_czech_date_to_iso(czech_date):
 
     month_map = {
-        "leden": "01", "únor": "02", "březen": "03", "duben": "04",
-        "květen": "05", "červen": "06", "červenec": "07", "srpen": "08",
-        "září": "09", "říjen": "10", "listopad": "11", "prosinec": "12"
+        "ledna": "01", "února": "02", "března": "03", "dubna": "04",
+        "května": "05", "června": "06", "červenec": "07", "srpen": "08",
+        "září": "09", "října": "10", "listopadu": "11", "prosince": "12"
     }
         # Split the date string
     parts = czech_date.split()
@@ -51,16 +51,17 @@ def scraping_using_python_requests():
             if "–" in date:
                 days = "".join(date.split(" ")[:3]).split("–")
                 ending = " ".join(date.split(" ")[3:])
-                start = days[0] + " " + ending
-                end = days[1] + " " + ending
+                start = convert_czech_date_to_iso(days[0] + " " + ending)
+                end = convert_czech_date_to_iso(days[1] + " " + ending)
             else:
                 start = convert_czech_date_to_iso(event[0])
+                end = start
         except:
             continue
         name = event[1]
         events.append({"summary": name,
                        "start": {"date": start, 'timeZone': 'Europe/Berlin'},
-                       "end": {"date": start, 'timeZone': 'Europe/Berlin'}})
+                       "end": {"date": end, 'timeZone': 'Europe/Berlin'}})
     print(calendar_add_events(events))
 
 
