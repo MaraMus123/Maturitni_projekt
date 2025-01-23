@@ -1,12 +1,22 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime
+from helper_files.calendar_creater import calendar_add_events
 
 def convert_czech_date_to_iso(czech_date):
-    
-    parsed_date = datetime.datetime.strptime(czech_date, "%d. %B %Y")
-    
-    iso_date = parsed_date.strftime(f"%Y-%m-%d")
+
+    month_map = {
+        "leden": "01", "únor": "02", "březen": "03", "duben": "04",
+        "květen": "05", "červen": "06", "červenec": "07", "srpen": "08",
+        "září": "09", "říjen": "10", "listopad": "11", "prosinec": "12"
+    }
+        # Split the date string
+    parts = czech_date.split()
+    day = parts[0].strip(".")
+    month = month_map[parts[1].lower()]
+    year = parts[2]
+    # Construct ISO 8601 string
+    iso_date = f"{year}-{month}-{day}"
     return iso_date
 
 def scraping_using_python_requests():
@@ -34,15 +44,26 @@ def scraping_using_python_requests():
         events_raw.append((date, name_of_event))
     events = []
     for event in events_raw:
-        date = convert_czech_date_to_iso(event[0])
-        if "-" in date:
-            days = date.split(" ")[:3].split("-")
-            ending = date.split(" ")[3:]
-            start = days[0] + " " + ending
-            end = days[1] + " " + ending
+        date = event[0]
+        if "a" in date.split(" "):
+            continue
+        try:
+            if "–" in date:
+                days = "".join(date.split(" ")[:3]).split("–")
+                ending = " ".join(date.split(" ")[3:])
+                start = days[0] + " " + ending
+                end = days[1] + " " + ending
+            else:
+                start = convert_czech_date_to_iso(event[0])
+        except:
+            continue
         name = event[1]
-        events.append({"summary": name, "start": {"date": date}, "end": {"date": date}})
+        events.append({"summary": name,
+                       "start": {"date": start, 'timeZone': 'Europe/Berlin'},
+                       "end": {"date": start, 'timeZone': 'Europe/Berlin'}})
+    print(calendar_add_events(events))
 
-        
+
+
 if __name__ == '__main__':
     scraping_using_python_requests()
