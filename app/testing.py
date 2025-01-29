@@ -1,48 +1,26 @@
-import requests
-import os
-from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 
-def authenticate():
-    """Retrieve the token for the API.
-    
-    Returns:
-        str: The token for the API.
+
+def scraping_using_selenium():
     """
-    login = os.getenv("LOGIN")
-    password = os.getenv("PASSWORD")
-    url = "https://gulz.bakalari.cz/api/login"
+    Retrieve information using Selenium.
 
-    payload = f'client_id=ANDR&grant_type=password&username={login}&password={password}'
-    headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Cookie': 'ASP.NET_SessionId=20ptxqgvkgffnkvs2jgbqn0s'
-    }
-
-    response = requests.request("POST", url, headers=headers, data=payload)
-
-    if response.status_code == 200:
-        return response.json()["access_token"]
-    
-access_token = authenticate()
-headers = {
-    'Authorization': f'Bearer {access_token}'
-}
-url = "https://gulz.bakalari.cz/api/3/absence/student"
-result = requests.request("GET", url, headers=headers)
-absences_per_day = result.json()["Absences"]
-absences_per_subject = result.json()["AbsencesPerSubject"]
-for absence in absences_per_day:
-    if absence["Unsolved"] != 0:
-        print(f"{absence["Date"]} - Unresolved: {absence["Unsolved"]} hours.")
-for absence in absences_per_subject:
-    percentage = absence["Base"] / absence["LessonsCount"] * 100
-    if 15 < percentage < 20:
-        print(f"Still ok, but getting close: {absence["SubjectName"]} - {percentage}%")
-    elif percentage >= 20:
-        print(f"Might wanna start attending more {absence["SubjectName"]} classes. Your absence is {percentage}%")
-    
-
-    
-
+    Returns:
+        None
+    """
+    driver = webdriver.Chrome()
+    for i in range(10):
+        driver.get(f"https://www.luxor.cz/c/9548/knihy?pi={i + 1}")
+        books = [book.find_element(By.CLASS_NAME, "product-box").find_element(By.CLASS_NAME, "product-box__title").get_attribute("href") for book in
+                 driver.find_element(By.CLASS_NAME, "product-list").find_elements(By.TAG_NAME, "cmp-product-box")]
+        for book in books:
+            detaily = {}
+            driver.get(book)
+            title = driver.find_element(By.TAG_NAME, "h1").text
+            details = driver.find_elements(By.XPATH, ".//div[@class='detail-info__item']")
+            for detail in details:
+                detaily[detail.split(":")[0]] = detail.split(":")[1].strip()
+scraping_using_selenium()
 

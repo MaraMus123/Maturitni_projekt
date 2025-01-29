@@ -3,12 +3,15 @@ from bs4 import BeautifulSoup
 import datetime
 import os
 from dotenv import load_dotenv
-from helper_files.calendar_creater import (calendar_add_events, 
+from helper_files.calendar_creater import (calendar_add_events,
                                            convert_czech_date_to_iso)
-from helper_files.proccess_bakalari import (proccess_marks, 
+from helper_files.proccess_bakalari import (proccess_marks,
                                             calculate_what_do_I_need_to_improve)
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 load_dotenv()
+
 
 def scraping_using_python_requests():
     """
@@ -62,7 +65,7 @@ def scraping_using_apis():
     # Authentication
     def authenticate():
         """Retrieve the token for the API.
-        
+
         Returns:
             str: The token for the API.
         """
@@ -107,7 +110,7 @@ def scraping_using_apis():
     for index, (key, value) in enumerate(current_vysvedceni.items()):
         if round(float(value[0].replace(",", "."))) != 1.0:
             room_for_improvement = True
-        print(f"{index + 1} {key}: {round(float(value[0].replace(",", ".")))}")
+        print(f"{index + 1} {key}: {round(float(value[0].replace(',', '.')))}")
     if room_for_improvement:
         while True:
             improve_subjects = input("""Here is how your mark certificate looks like right now. Would you like to improve it?
@@ -134,7 +137,7 @@ If so, state comma separated indexes of the subjects you want to improve: """)
                 for mark in value:
                     print(f"\t You would need Mark: {mark[0]} Weight: {mark[1]}")
             print("-" * len(subject_key))
-            print("\n") 
+            print("\n")
     # Check the schedule
     def get_schedule(access_token: str):
         """Retrieve the schedule from the API.
@@ -181,19 +184,42 @@ If so, state comma separated indexes of the subjects you want to improve: """)
     absences_per_subject = result["AbsencesPerSubject"]
     for absence in absences_per_day:
         if absence["Unsolved"] != 0:
-            print(f"{absence["Date"]} - Unresolved: {absence["Unsolved"]} hours.")
+            print(f"{absence['Date']} - Unresolved: {absence['Unsolved']} hours.")
     for absence in absences_per_subject:
         percentage = absence["Base"] / absence["LessonsCount"] * 100
         if 15 < percentage < 20:
-            print(f"Still ok, but getting close: {absence["SubjectName"]} - {percentage}%")
+            print(f"Still ok, but getting close: {absence['SubjectName']} - {percentage}%")
         elif percentage >= 20:
-            print(f"Might wanna start attending more {absence["SubjectName"]} classes. Your absence is {percentage}%")
+            print(f"Might wanna start attending more {absence['SubjectName']} classes. Your absence is {percentage}%")
 
 
-    
+def scraping_using_selenium():
+    """
+    Retrieve information using Selenium.
+
+    Returns:
+        None
+    """
+    driver = webdriver.Chrome()
+    for i in range(10):
+        driver.get(f"https://www.luxor.cz/c/9548/knihy?pi={i + 1}")
+        books = [book.find_element(By.CLASS_NAME, "product-box").find_element(By.TAG_NAME, "a").get_attribute("href") for book in
+                 driver.find_element(By.CLASS_NAME, "product-list").find_elements(By.TAG_NAME, "cmp-product-box")]
+        for book in books:
+            driver.get(book)
+            title = driver.find_element(By.CLASS_NAME, "detail__title heading-h1").text
+            details = driver.find_elements(By.XPATH, ".//div[@class='detail-info__item]")
+            print(details[1].text)
 
 
-            
-    
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
-    scraping_using_python_requests()
+    scraping_using_selenium()

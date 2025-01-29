@@ -6,3 +6,4 @@ google-auth-oauthlib==0.4.1
 google-auth-httplib2==0.0.4
 httplib2
 python-dotenv
+selenium
