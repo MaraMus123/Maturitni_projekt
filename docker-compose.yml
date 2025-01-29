@@ -4,6 +4,7 @@ services:
   app:
     build:
       context: .
+      tty: true  
     working_dir: /app
     command: python script.py
     volumes:

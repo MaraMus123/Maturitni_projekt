@@ -1,29 +1,21 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime
-from helper_files.calendar_creater import calendar_add_events
+import os
+from dotenv import load_dotenv
+from helper_files.calendar_creater import (calendar_add_events, 
+                                           convert_czech_date_to_iso)
+from helper_files.proccess_bakalari import (proccess_marks, 
+                                            calculate_what_do_I_need_to_improve)
 
-def convert_czech_date_to_iso(czech_date):
-
-    month_map = {
-        "ledna": "01", "února": "02", "března": "03", "dubna": "04",
-        "května": "05", "června": "06", "červenec": "07", "srpen": "08",
-        "září": "09", "října": "10", "listopadu": "11", "prosince": "12"
-    }
-        # Split the date string
-    parts = czech_date.split()
-    day = parts[0].strip(".")
-    month = month_map[parts[1].lower()]
-    year = parts[2]
-    # Construct ISO 8601 string
-    iso_date = f"{year}-{month}-{day}"
-    return iso_date
+load_dotenv()
 
 def scraping_using_python_requests():
     """
     Retrieves the basic html of the specified url.
-    Args:
-        url (string): the specified url.
+
+    Returns:
+        None
     """
     headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -65,6 +57,143 @@ def scraping_using_python_requests():
     print(calendar_add_events(events))
 
 
+def scraping_using_apis():
+    """Retrieve information directly from the database using APIs."""
+    # Authentication
+    def authenticate():
+        """Retrieve the token for the API.
+        
+        Returns:
+            str: The token for the API.
+        """
+        login = os.getenv("LOGIN")
+        password = os.getenv("PASSWORD")
+        url = "https://gulz.bakalari.cz/api/login"
 
+        payload = f'client_id=ANDR&grant_type=password&username={login}&password={password}'
+        headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': 'ASP.NET_SessionId=20ptxqgvkgffnkvs2jgbqn0s'
+        }
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        if response.status_code == 200:
+            return response.json()["access_token"]
+    access_token = authenticate()
+    # Get marks
+    def get_marks(access_token: str) -> dict:
+        """Retrieve the marks from the API.
+        Args:
+            access_token (str): A valid access token for authenticating with the API.
+
+        Returns:
+            dict: The marks from the API.
+        """
+        url = "https://gulz.bakalari.cz/api/3/marks"
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
+
+        response = requests.request("GET", url, headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+    marks = get_marks(access_token)
+
+    # Process the marks
+    current_vysvedceni = proccess_marks(marks)
+    room_for_improvement = False
+    for index, (key, value) in enumerate(current_vysvedceni.items()):
+        if round(float(value[0].replace(",", "."))) != 1.0:
+            room_for_improvement = True
+        print(f"{index + 1} {key}: {round(float(value[0].replace(",", ".")))}")
+    if room_for_improvement:
+        while True:
+            improve_subjects = input("""Here is how your mark certificate looks like right now. Would you like to improve it?
+If so, state comma separated indexes of the subjects you want to improve: """)
+            if improve_subjects:
+                try:
+                    improve_subjects = map(int, [i.strip() for i in improve_subjects.split(",")])
+                    break
+                except:
+                    "That is not the correct format."
+            else:
+                print("Well, as you wish!")
+                break
+    else:
+        print("Nothing to be improved, you are doing great, keep it up!")
+    if room_for_improvement:
+        for index in improve_subjects:
+            subject_key = list(current_vysvedceni.keys())[index - 1]
+            print(subject_key)
+            print("-" * len(subject_key))
+            result = calculate_what_do_I_need_to_improve(current_vysvedceni[subject_key][1])
+            for key, value in result.items():
+                print("If you want to improve to", key)
+                for mark in value:
+                    print(f"\t You would need Mark: {mark[0]} Weight: {mark[1]}")
+            print("-" * len(subject_key))
+            print("\n") 
+    # Check the schedule
+    def get_schedule(access_token: str):
+        """Retrieve the schedule from the API.
+        Args:
+            access_token (str): A valid access token for authenticating with the API.
+
+        Returns:
+            dict: The schedule from the API.
+        """
+        year = datetime.datetime.now().year
+        month = datetime.datetime.now().month
+        day = datetime.datetime.now().day
+        url = f"https://gulz.bakalari.cz/api/3/timetable/actual?date={year}-{month}-{day}"
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
+        result = requests.request("GET", url, headers=headers)
+        return result.json()
+    day_in_week = datetime.datetime.now().weekday()
+    schedule = get_schedule(access_token)["Days"]
+    today = schedule[day_in_week]["Atoms"]
+    print("Today´s changes in schedule:")
+    for d in today:
+        s = d["Change"]
+        if d["Change"] != None:
+            print(s["Hours"], s["ChangeType"], s["Description"])
+    # Check absence
+    def get_absence(access_token: str):
+        """Retrieve the absence from the API.
+        Args:
+            access_token (str): A valid access token for authenticating with the API.
+
+        Returns:
+            dict: The absence from the API.
+        """
+        url = "https://gulz.bakalari.cz/api/3/absence/student"
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
+        result = requests.request("GET", url, headers=headers)
+        return result.json()
+    result = get_absence(access_token)
+    absences_per_day = result["Absences"]
+    absences_per_subject = result["AbsencesPerSubject"]
+    for absence in absences_per_day:
+        if absence["Unsolved"] != 0:
+            print(f"{absence["Date"]} - Unresolved: {absence["Unsolved"]} hours.")
+    for absence in absences_per_subject:
+        percentage = absence["Base"] / absence["LessonsCount"] * 100
+        if 15 < percentage < 20:
+            print(f"Still ok, but getting close: {absence["SubjectName"]} - {percentage}%")
+        elif percentage >= 20:
+            print(f"Might wanna start attending more {absence["SubjectName"]} classes. Your absence is {percentage}%")
+
+
+    
+
+
+            
+    
 if __name__ == '__main__':
     scraping_using_python_requests()

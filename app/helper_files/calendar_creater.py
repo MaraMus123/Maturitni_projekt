@@ -1,28 +1,36 @@
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 import os
 import pickle
 
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+token_path = r'C:\Users\marek\IdeaProjects\Maturitni_projekt\credentials\token.pickle'
+
 
 def authenticate_google_calendar():
     creds = None
 
-    if os.path.exists('/app/credentials/token.pickle'):
-        with open('/app/credentials/token.pickle', 'rb') as token:
+    if os.path.exists(token_path):
+        with open(token_path, 'rb') as token:
             creds = pickle.load(token)
     else:
-        raise FileNotFoundError("Token not found")
+        pass
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                print("Token has expired or been revoked. Deleting token and reauthenticating.")
+                os.remove(token_path)
+                return authenticate_google_calendar()
         else:
 
-            flow = InstalledAppFlow.from_client_secrets_file('/app/credentials/client_secret_calendar_api.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(r'C:\Users\marek\IdeaProjects\Maturitni_projekt\credentials\client_secret_calendar.json', SCOPES)
             creds = flow.run_console()
 
         with open('token.pickle', 'wb') as token:
@@ -67,5 +75,22 @@ def calendar_add_events(event_list):
     create_new_events(service, event_list)
 
     return "All the events successfully created!"
+
+def convert_czech_date_to_iso(czech_date):
+
+    month_map = {
+        "ledna": "01", "února": "02", "března": "03", "dubna": "04",
+        "května": "05", "června": "06", "červenec": "07", "srpen": "08",
+        "září": "09", "října": "10", "listopadu": "11", "prosince": "12"
+    }
+        # Split the date string
+    parts = czech_date.split()
+    day = parts[0].strip(".")
+    month = month_map[parts[1].lower()]
+    year = parts[2]
+    # Construct ISO 8601 string
+    iso_date = f"{year}-{month}-{day}"
+    return iso_date
+
 
 
