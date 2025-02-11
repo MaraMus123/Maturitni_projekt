@@ -1,14 +1,23 @@
 import requests
 from bs4 import BeautifulSoup
+
 import datetime
 import os
 from dotenv import load_dotenv
+
 from helper_files.calendar_creater import (calendar_add_events,
                                            convert_czech_date_to_iso)
+
 from helper_files.proccess_bakalari import (proccess_marks,
                                             calculate_what_do_I_need_to_improve)
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import time
+import xlsxwriter
 
 load_dotenv()
 
@@ -201,25 +210,63 @@ def scraping_using_selenium():
         None
     """
     driver = webdriver.Chrome()
-    for i in range(10):
+    workbook = xlsxwriter.Workbook("Luxor_books.xlsx")
+    worksheet = workbook.add_worksheet("Data")
+    database = workbook.add_worksheet("Database")
+    wait = WebDriverWait(driver, 10)
+
+    index = 0
+    column = 0
+    for i in range(1):
         driver.get(f"https://www.luxor.cz/c/9548/knihy?pi={i + 1}")
-        books = [book.find_element(By.CLASS_NAME, "product-box").find_element(By.TAG_NAME, "a").get_attribute("href") for book in
+        time.sleep(2)
+        element = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "product-list")))
+        books = [book.find_element(By.CLASS_NAME, "product-box").find_element(By.CLASS_NAME, "product-box__title").get_attribute("href") for book in
                  driver.find_element(By.CLASS_NAME, "product-list").find_elements(By.TAG_NAME, "cmp-product-box")]
         for book in books:
+            detaily = {}
             driver.get(book)
-            title = driver.find_element(By.CLASS_NAME, "detail__title heading-h1").text
-            details = driver.find_elements(By.XPATH, ".//div[@class='detail-info__item]")
-            print(details[1].text)
-
-
-
-
-
-
-
-
-
-
+            time.sleep(2)
+            try:
+                detaily["title"] = driver.find_element(By.TAG_NAME, "h1").text
+            except:
+                print(book)
+            details = driver.find_elements(By.XPATH, ".//div[@class='detail-info__item']")
+            for detail in details[1:]:
+                detail = detail.text
+                detaily[detail.split(":")[0]] = detail.split(":")[1].strip()
+            if not detaily.get("Edice"):
+                detaily["Edice"] = ""
+            if not detaily.get("Série"):	
+                detaily["Série"] = ""
+            detaily["current_price"] = driver.find_element(By.XPATH, ".//div[@class='prices__item prices__item--main']").get_attribute("innerHTML").replace("&nbsp;", "")
+            try:
+                detaily["base_price"] = driver.find_element(By.XPATH, ".//div[@class='prices__base']").find_element(By.XPATH, ".//div[@class='prices__item prices__item--base']").get_attribute("innerHTML").replace("&nbsp;", "")
+            except:
+                detaily["base_price"] = detaily["current_price"]
+            detaily["url"] = book
+            detaily["image"] = driver.find_element(By.XPATH, ".//img[@class='lg-object lg-image']").get_attribute("src")
+            rezervation_element = driver.find_element(By.XPATH, ".//button[@class='btn-cart btn-cart--reserve btn-cart--big']")
+            try:
+                rezervation_element.click()
+                time.sleep(2)
+                possible_pickup = [store.find_element(By.CLASS_NAME, "modal-store-list__title").get_attribute("innerHTML") 
+                                for store in driver.find_elements(By.XPATH, ".//div[@class='modal-store-list__item']")]
+            except:
+                possible_pickup = ["No stores available for reservation."]
+            if index == 0:
+                for i, key in enumerate(detaily.keys()):
+                    worksheet.write(0, i, key)
+                index += 1
+            for i, value in enumerate(detaily.values()):
+                worksheet.write(index, i, value)
+            index += 1
+            database.write(0, column, detaily["title"])
+            for row, pickup in enumerate(possible_pickup):
+                database.write(row + 1, column, pickup)
+            column += 1
+    workbook.close()
+            
 
 if __name__ == '__main__':
     scraping_using_selenium()
