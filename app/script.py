@@ -270,5 +270,7 @@ def scraping_using_selenium():
 
 if __name__ == '__main__':
     scraping_using_python_requests()
+    input(":")
     scraping_using_apis()
+    input(":")
     scraping_using_selenium()
